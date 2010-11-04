@@ -23,11 +23,13 @@ from scatterbrainz.external.my_MB import getRelease, searchRelease
 log = logging.getLogger(__name__)
 
 from scatterbrainz.model.meta import Session
-from scatterbrainz.model import AudioFile, Track, Album, Artist
+from scatterbrainz.model.track import Track
+from scatterbrainz.model.artist import Artist
+from scatterbrainz.model.album import Album
 
 from scatterbrainz.config.config import Config
 
-#from scatterbrainz.services import albumart
+from scatterbrainz.services import albumart
 from scatterbrainz.lib import pylast
 
 from repoze.what.predicates import has_permission
@@ -52,42 +54,26 @@ class HelloController(BaseController):
         if idStr == 'init':
             return self._allArtistsTreeJSON()
         else:
-            [type, mbid] = idStr.split('_',1)
+            [type, id] = idStr.split('/',1)
             if type == 'Artist':
-                return self._albumsForArtistTreeJSON(mbid)
+                return self._albumsForArtistTreeJSON(id)
             elif type == 'Album':
-                return self._tracksForAlbumTreeJSON(mbid)
+                return self._tracksForAlbumTreeJSON(id)
             else:
                 raise Exception('bad type '+type)
     
     def _allArtistsTreeJSON(self):
-        artists = Session.query(Artist)
-        return self._dumpFlatJSON(artists, self._compareArtists)
-        
-    def _albumsForArtistTreeJSON(self, mbid):
-        albums = Session.query(Artist).filter_by(mbid=mbid).one().albums
-        albums.sort(lambda a,b: cmp(a.getReleaseDate(), b.getReleaseDate()))
-        return self._dumpFlatJSON(albums, None)
+        artists = Session.query(Artist).join(Album)
+        return self._dumpFlatJSON(artists, self._compareTreeFloatVA)
     
-    def _tracksForAlbumTreeJSON(self, mbid):
-        tracks = Session.query(Album).filter_by(mbid=mbid).one().tracks
-        tracks.sort(self._compareTracks)
+    def _albumsForArtistTreeJSON(self, artistid):
+        albums = Session.query(Album).join(Artist).filter_by(id=artistid)
+        return self._dumpFlatJSON(albums)
+    
+    def _tracksForAlbumTreeJSON(self, albumid):
+        tracks = Session.query(Track).filter_by(albumid=albumid).order_by(Track.filepath)
         return self._dumpFlatJSON(tracks, None)
-
-    def _compareTracks(self, a, b):
-        abonus = '(bonus' in a.release_name.lower()
-        bbonus = '(bonus' in b.release_name.lower()
-        if abonus != bbonus:
-            return cmp(abonus, bbonus)
-        elif a.release_name != b.release_name:
-            return cmp(a.release_name, b.release_name)
-        elif a.discnum != b.discnum:
-            return cmp(a.discnum, b.discnum)
-        elif a.tracknum != b.tracknum:
-            return cmp(a.tracknum, b.tracknum)
-        else:
-            return cmp(a.name)
-
+    
     def _dumpFlatJSON(self, results, sortfun=cmp):
         json = map(lambda x: x.toTreeJSON(), results)
         if sortfun:
@@ -96,7 +82,7 @@ class HelloController(BaseController):
     
     def getTracksAJAX(self):
         idStr = request.params['id']
-        [type, id] = idStr.split('_',1)
+        [type, id] = idStr.split('/',1)
         if type == 'Track':
             return self._trackPlaylistJSON(id)
         elif type == 'Artist':
@@ -127,8 +113,8 @@ class HelloController(BaseController):
         randomTrack = rand.choice(randomSimilarArtist.tracks)
         return simplejson.dumps([randomTrack.toPlaylistJSON()])
     
-    def _trackPlaylistJSON(self, fileid):
-        tracks = [Session.query(Track).filter_by(fileid=fileid).one()]
+    def _trackPlaylistJSON(self, trackid):
+        tracks = Session.query(Track).filter_by(id=trackid).order_by(Track.filepath)
         return self._playlistJSON(tracks)
     
     def _tracksForAlbumPlaylistJSON(self, albumid):
@@ -208,22 +194,16 @@ class HelloController(BaseController):
                         # artist itself matched search results, don't add child tracks
                         continue
         json = artistIdToJSON.values()
-        json.sort(self._compareArtists)
+        json.sort(self._compareTreeFloatVA)
         return simplejson.dumps(json)
 
-    def _compareArtists(self, a, b):
+    def _compareTreeFloatVA(self, a, b):
         if a['data'] == 'Various Artists':
             return -1
         elif b['data'] == 'Various Artists':
             return 1
         else:
-            return cmp(self._removeThe(a['data']), self._removeThe(b['data']))
-    
-    def _removeThe(self, s):
-        if s.lower().startswith('the '):
-            return s[4:]
-        else:
-            return s
+            return cmp(a['data'], b['data'])
     
     def debug(self):
         raise Exception
@@ -354,9 +334,9 @@ class HelloController(BaseController):
                         artistSearch = artist.name
                     release = searchRelease(artistSearch, album.name)
                 if release and not album.mbid:
-                    album.mbid = release.id.split('_')[-1]
+                    album.mbid = release.id.split('/')[-1]
                 if release and not artist.mbid:
-                    artist.mbid = release.artist.id.split('_')[-1]
+                    artist.mbid = release.artist.id.split('/')[-1]
             if release:
                 albumName = release.title
                 asin = release.getAsin()
