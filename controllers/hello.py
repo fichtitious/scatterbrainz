@@ -8,6 +8,8 @@ import simplejson
 import unicodedata
 import htmlentitydefs
 
+from operator import itemgetter
+
 from datetime import datetime, timedelta
 
 import logging
@@ -315,8 +317,19 @@ class HelloController(BaseController):
         json = {}
         if track.lyrics:
             json['lyrics'] = track.lyrics
+            json['trackid'] = track.id
+            json['frames'] = track.lyricsFrames
         return simplejson.dumps(json)
-    
+
+    def saveLyricsFramesAJAX(self):
+        trackid = request.params['trackid']
+        recordedFrames = simplejson.loads(request.params['frames']) # list of (time, lyrics line index) pairs
+        recordedFrames.sort(key = itemgetter(0))                    # (sort by time)
+        Session.begin()
+        track = Session.query(Track).filter_by(id=trackid).one()
+        track.lyricsFrames = recordedFrames
+        Session.commit()
+
     def getTrackInfoAJAX(self):
         trackid = request.params['trackid'].split('_')[1]
         track = Session.query(Track).filter_by(id=trackid).one()

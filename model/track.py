@@ -1,6 +1,6 @@
 from sqlalchemy.ext.declarative import declarative_base
 
-from sqlalchemy import Column, Integer, String, Unicode, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Unicode, DateTime, ForeignKey, PickleType
 
 from scatterbrainz.model.meta import metadata
 from scatterbrainz.model.artist import Artist
@@ -43,6 +43,7 @@ class Track(Base):
     
     # Lyrics
     lyrics = Column(Unicode)
+    lyricsFrames = Column(PickleType)
     lastHitLyricWiki = Column(DateTime)
     
     # Generated props
