@@ -722,8 +722,11 @@ var lyricsWidget = (function () {
             recordedFrames = [];
         });
         $('.lyricsLine').live('click', function() {
+            var lineIdx = parseInt($(this).attr('id').split('_')[1]);
             if (recording) {
-                recordedFrames.push([playedTime, parseInt($(this).attr('id').split('_')[1])]);
+                recordedFrames.push([playedTime, lineIdx]);
+            } else {
+                jumpPlayerToLyric(lineIdx);
             }
         });
         $('.lyricsLine').live('hover', function() {
@@ -757,6 +760,17 @@ var lyricsWidget = (function () {
             'trackid' : trackid});
     }
 
+    function jumpPlayerToLyric(lineIdx) {
+        for (i = 0; i < playingFrames.length; i++) {
+            var frame = playingFrames[i];
+            if (lineIdx == frame[1]) {
+                var timeToJumpTo = frame[0];
+                $('#jquery_jplayer').jPlayer('playHeadTime', timeToJumpTo);
+                return;
+            }
+        }
+    }
+
     function lyricsAjaxCallback(data) {
         if ('lyrics' in data) {
             var lyricsLines = data['lyrics'].split('<br />');
@@ -779,16 +793,18 @@ var lyricsWidget = (function () {
 
     function updateFromPlayer(pt) {
         playedTime = pt;
-        if (playingFrames !== null) {
+        if (!recording && playingFrames !== null) {
             updatePlayingFrame();
         }
     };
 
     function setPlayingLineIdx(newIdx) {
         if (newIdx != playingLineIdx) {
-            $('.lyricsLine').removeClass('highlightedLyrics');
-            $('#lyricsLine_'+newIdx).addClass('highlightedLyrics');
             playingLineIdx = newIdx;
+            $('.lyricsLine').removeClass('highlightedLyrics');
+            if (newIdx !== undefined) {
+                $('#lyricsLine_'+newIdx).addClass('highlightedLyrics');
+            }
         }
     }
 
@@ -805,7 +821,7 @@ var lyricsWidget = (function () {
             playingFrameIdx--;                                        // try the previous frame
             updatePlayingFrame();
         } else {
-            setPlayingLineIdx(0);                                     // we're before the very first frame
+            setPlayingLineIdx(undefined);                             // we're before the very first frame
         }
     }
 
