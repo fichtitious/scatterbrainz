@@ -5,6 +5,7 @@ import urllib
 import string
 import random as rand
 import simplejson
+import unicodedata
 import htmlentitydefs
 
 from datetime import datetime, timedelta
@@ -243,21 +244,29 @@ class HelloController(BaseController):
             datetime.now() > track.lastHitLyricWiki + timedelta(days=10)):
             
             track.lastHitLyricWiki = datetime.now()
-            
             title = track.id3title
             artist = track.id3artist
-            params = {
-                'artist' : artist,
-                'song'   : title,
-                'fmt'    : 'json',
-            }
-            
-            url = 'http://lyrics.wikia.com/api.php?%s' % urllib.urlencode(params)
-            
-            log.info('[lyric] Hitting ' + url)
-            html = urllib.urlopen(url).read()
-            
-            if not "'lyrics':'Not found'" in html:
+
+            def getLyricsHtml(encoder = lambda s: s):
+                params = {
+                    'artist' : encoder(artist),
+                    'song'   : encoder(title),
+                    'fmt'    : 'json',
+                }
+                url = 'http://lyrics.wikia.com/api.php?%s' % urllib.urlencode(params)
+                log.info('[lyric] Hitting ' + url)
+                html = urllib.urlopen(url).read()
+                return html if not "'lyrics':'Not found'" in html else None
+
+            try:
+                html = getLyricsHtml()
+            except UnicodeEncodeError:
+                html = getLyricsHtml(lambda s: s.encode('utf-8')) or \
+                       getLyricsHtml(lambda s: unicodedata.normalize('NFKD', s).encode('ascii', 'ignore'))
+                # wikia keys some int'l lyrics on correctly-encoded titles
+                # and others on normalized (e.g., "el nino") titles
+
+            if html:
                 search = re.search("'url':'(?P<url>.*?)'",html)
                 lyricurl = urllib.unquote(search.group('url'))
                 page = urllib.quote(lyricurl.split('/')[-1])
