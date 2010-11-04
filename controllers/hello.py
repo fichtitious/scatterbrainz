@@ -113,8 +113,9 @@ class HelloController(BaseController):
         similarArtists = lastfmArtist.get_similar()
         similarMbids = filter(lambda x: x is not None, map(lambda x: x.mbid, similarArtists))
         randomSimilarArtist = Session.query(Artist).filter(Artist.mbid.in_(similarMbids)).order_by(random()).first()
-        randomTrack = rand.choice(randomSimilarArtist.tracks)
-        return simplejson.dumps([randomTrack.toPlaylistJSON()])
+        return simplejson.dumps([rand.choice(randomSimilarArtist.tracks).toPlaylistJSON()]) \
+            if randomSimilarArtist \
+            else self.randomTrackAJAX()
     
     def _trackPlaylistJSON(self, trackid):
         tracks = Session.query(Track).filter_by(id=trackid).order_by(Track.filepath)
