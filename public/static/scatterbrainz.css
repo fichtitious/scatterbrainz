@@ -444,6 +444,10 @@ div.nowPlayingHeader {
     font-size: 18px;
 }
 
-.highlightedLyrics {
+.lyricPlaying {
+    font-weight: bold;
+}
+
+.lyricRecording {
     background-color: #ccc;
 }

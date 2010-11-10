@@ -712,11 +712,11 @@ var lyricsWidget = (function () {
     function init() {
         lyricsContainer = $('#nowPlayingTrackLyrics');
         $('#nowPlayingTrackHeader').click(startRecording);
-        $('#lyricsRecordingCancel').click(function() {
+        $('#lyricFramesRecordingCancel').click(function() {
             stopRecording();
             recordedFrames = [];
         });
-        $('#lyricsRecordingSubmit').click(function() {
+        $('#lyricFramesRecordingSubmit').click(function() {
             saveRecordedFrames();
             stopRecording();
             recordedFrames = [];
@@ -725,39 +725,43 @@ var lyricsWidget = (function () {
             var lineIdx = parseInt($(this).attr('id').split('_')[1]);
             if (recording) {
                 recordedFrames.push([playedTime, lineIdx]);
-            } else {
+            } else if (playingFrames !== undefined) {
                 jumpPlayerToLyric(lineIdx);
             }
         });
         $('.lyricsLine').live('hover', function() {
             if (recording) {
-                $(this).toggleClass('highlightedLyrics');
+                $(this).toggleClass('lyricRecording');
             }
         });
         playedTime = 0;
         recording = false;
         recordedFrames = [];
-        playingFrames = null;
+        playingFrames = undefined;
         playingFrameIdx = 0;
         playingLineIdx = undefined;
     };
 
     function startRecording() {
         recording = true;
-        $('#lyricsRecordingCancel').show();
-        $('#lyricsRecordingSubmit').show();
+        $('#lyricFramesRecording').show();
+        expandHeightToFitBrowser(lyricsContainer);
+        $('.lyricsLine').removeClass('lyricPlaying');
     }
 
     function stopRecording() {
         recording = false;
-        $('#lyricsRecordingCancel').hide();
-        $('#lyricsRecordingSubmit').hide();
+        $('#lyricFramesRecording').hide();
+        expandHeightToFitBrowser(lyricsContainer);
     }
 
     function saveRecordedFrames() {
         $.post('/hello/saveLyricsFramesAJAX',
            {'frames' : JSON.stringify(recordedFrames),
-            'trackid' : trackid});
+            'trackid' : trackid},
+            function() {
+                populatePlayingTrackInfo('trackid_' + trackid);
+            });
     }
 
     function jumpPlayerToLyric(lineIdx) {
@@ -782,18 +786,22 @@ var lyricsWidget = (function () {
             }
             lyricsContainer.html(lyricsHtml);
             playingFrames = data['frames'];
+            if (!playingFrames || playingFrames.length == 0) {
+                playingFrames = undefined;
+            }
             playingFrameIdx = 0;
             playingLineIdx = undefined;
             trackid = data['trackid'];
         } else {
             lyricsContainer.html('');
+            playingFrames = undefined;
         }
         expandHeightToFitBrowser(lyricsContainer);
     };
 
     function updateFromPlayer(pt) {
         playedTime = pt;
-        if (!recording && playingFrames !== null) {
+        if (playingFrames && !recording) {
             updatePlayingFrame();
         }
     };
@@ -801,9 +809,9 @@ var lyricsWidget = (function () {
     function setPlayingLineIdx(newIdx) {
         if (newIdx != playingLineIdx) {
             playingLineIdx = newIdx;
-            $('.lyricsLine').removeClass('highlightedLyrics');
+            $('.lyricsLine').removeClass('lyricPlaying');
             if (newIdx !== undefined) {
-                $('#lyricsLine_'+newIdx).addClass('highlightedLyrics');
+                $('#lyricsLine_'+newIdx).addClass('lyricPlaying');
             }
         }
     }
@@ -843,7 +851,7 @@ function populatePlayingTrackInfo(trackid) {
             $('#playingAlbum').html(data['album']);
             $('#nowPlayingAlbumHeader').html(data['album']);
             $('#playingTrack').html(data['track']);
-            $('#nowPlayingTrackHeader').html(data['track']);
+            $('#nowPlayingTrackHeader').text(data['track']);
             if ('asin' in data) {
                 $('#nowPlayingAlbumInfo').html('<a target="_blank" href="http://www.amazon.com/dp/' + data['asin'] + '">amazon</a>');
             } else {
